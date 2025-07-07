@@ -5,9 +5,9 @@ This capstone project is a full-stack application designed to **predict the risk
 Built using **React (frontend)** and **FastAPI (backend)** with role-based access and machine learning integration.
 
 ---
-## 🔍 Key Features
+##  Key Features
 
-### 🧠 Predictive Modeling
+###  Predictive Modeling
 - Disease-specific machine learning models:
   - Pneumonia
   - Heart Failure
@@ -16,19 +16,19 @@ Built using **React (frontend)** and **FastAPI (backend)** with role-based acces
 - Model explainability with SHAP and LLM (coming soon)
 ### 👥 Role-Based Access
 
-#### 👤 User / Nurse
+#### User / Nurse
 - Login and view tasks
 - View assigned patients ordered by risk
 - Access patient profile and follow-up history
 - Submit new follow-ups
 - Raise priority escalation requests
 
-#### 🛠️ Admin
+####  Admin
 - View high-priority patients and pending escalations
 - Assign tasks and manage follow-ups across the system
 - Approve or reject priority escalations
 - Audit system usage and predictions
-## 🛠️ Tech Stack
+## Tech Stack
 
 | Layer         | Stack                             |
 |---------------|-----------------------------------|
