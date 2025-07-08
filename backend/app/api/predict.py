@@ -1,6 +1,6 @@
 from http.client import responses
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException,Depends
 from app.models.predict import PneumoniaInput,DiabetesInput,HeartFailureInput
 from app.services.explanation import explain_with_gemini
 import pandas as pd
@@ -10,7 +10,8 @@ import json
 import os
 import numpy as np
 from app.services.assign_age import get_age_bucket
-
+from app.services.auth_middleware import get_current_user
+from app.models.user import User
 router = APIRouter(prefix="/predict", tags=["Prediction"])
 
 def convert_numpy(obj):
@@ -23,7 +24,7 @@ def convert_numpy(obj):
     return obj
 
 @router.post("/pneumonia")
-def predict_pneumonia(input_data: PneumoniaInput):
+def predict_pneumonia(input_data: PneumoniaInput,current_user: User = Depends(get_current_user)):
     try:
         # Convert input to dict and DataFrame
         user_data = input_data.dict()
@@ -88,7 +89,7 @@ def predict_pneumonia(input_data: PneumoniaInput):
         raise HTTPException(status_code=500, detail=f"Prediction failed: {str(e)}")
 
 @router.post("/heart_failure")
-def predict_heart_failure(input_data: HeartFailureInput):
+def predict_heart_failure(input_data: HeartFailureInput,current_user: User = Depends(get_current_user)):
     raw_data = input_data.model_dump()
     df = pd.DataFrame([raw_data])
     encoder = joblib.load("models/model_heartfailure/encoder_heart.pkl")
@@ -128,8 +129,9 @@ def predict_heart_failure(input_data: HeartFailureInput):
     return response
 
 @router.post("/diabetes")
-def predict_diabetes(input_data: DiabetesInput):
+def predict_diabetes(input_data: DiabetesInput,current_user: User = Depends(get_current_user)):
     input_json = input_data.model_dump()
+    input_json['diabetesMed'] = "Yes"
     df = pd.DataFrame([input_json])
     df.drop(columns=["patient_nbr"], errors="ignore", inplace=True)
 
