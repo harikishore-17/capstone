@@ -1,11 +1,14 @@
+from dotenv import load_dotenv
 from google import genai
 from google.genai import types
-
+import os
+load_dotenv()
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 def explain_with_gemini(response: dict) -> str:
     explanation = ""
 
     # Initialize Gemini Client
-    client = genai.Client(api_key="AIzaSyA5pq5GCfKCiDhb2PQQATPIOKIXChJeBqU")  # Replace with env var or secure loading
+    client = genai.Client(api_key=GEMINI_API_KEY)  # Replace with env var or secure loading
 
     # Extract values
     prediction_label = "Readmitted" if response["prediction"] == 1 else "Not Readmitted"
