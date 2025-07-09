@@ -1,8 +1,7 @@
-from http.client import responses
-
 from fastapi import APIRouter, HTTPException,Depends
 from app.models.predict import PneumoniaInput,DiabetesInput,HeartFailureInput
 from app.services.explanation import explain_with_gemini
+from sqlalchemy.orm import Session
 import pandas as pd
 import joblib
 import shap
@@ -12,6 +11,8 @@ import numpy as np
 from app.services.assign_age import get_age_bucket
 from app.services.auth_middleware import get_current_user
 from app.models.user import User
+from app.utils.logger import log_prediction
+from app.dependencies import get_db
 router = APIRouter(prefix="/predict", tags=["Prediction"])
 
 def convert_numpy(obj):
@@ -24,7 +25,7 @@ def convert_numpy(obj):
     return obj
 
 @router.post("/pneumonia")
-def predict_pneumonia(input_data: PneumoniaInput,current_user: User = Depends(get_current_user)):
+def predict_pneumonia(input_data: PneumoniaInput,current_user: User = Depends(get_current_user),db: Session = Depends(get_db)):
     try:
         # Convert input to dict and DataFrame
         user_data = input_data.dict()
@@ -68,6 +69,14 @@ def predict_pneumonia(input_data: PneumoniaInput,current_user: User = Depends(ge
         # Predict
         proba = model.predict_proba(df)[0][1]
         pred = int(proba >= threshold)
+        log_prediction(
+            db=db,
+            user=current_user,
+            disease="pneumonia",
+            input_data=input_data.dict(),
+            prediction=pred,
+            probability=proba,
+        )
 
         # SHAP explanation
         explainer = shap.TreeExplainer(model.named_estimators_['xgb'])
@@ -89,7 +98,7 @@ def predict_pneumonia(input_data: PneumoniaInput,current_user: User = Depends(ge
         raise HTTPException(status_code=500, detail=f"Prediction failed: {str(e)}")
 
 @router.post("/heart_failure")
-def predict_heart_failure(input_data: HeartFailureInput,current_user: User = Depends(get_current_user)):
+def predict_heart_failure(input_data: HeartFailureInput,current_user: User = Depends(get_current_user),db: Session = Depends(get_db)):
     raw_data = input_data.model_dump()
     df = pd.DataFrame([raw_data])
     encoder = joblib.load("models/model_heartfailure/encoder_heart.pkl")
@@ -112,7 +121,14 @@ def predict_heart_failure(input_data: HeartFailureInput,current_user: User = Dep
     model = joblib.load("models/model_heartfailure/random_forest.pkl")
     proba = model.predict_proba(df)[0][1]
     pred = int(model.predict(df)[0])
-
+    log_prediction(
+        db=db,
+        user=current_user,
+        disease="Heart Failure",
+        input_data=input_data.dict(),
+        prediction=pred,
+        probability=proba,
+    )
     explainer = shap.Explainer(model)
     shap_values = explainer(df)
 
@@ -129,7 +145,7 @@ def predict_heart_failure(input_data: HeartFailureInput,current_user: User = Dep
     return response
 
 @router.post("/diabetes")
-def predict_diabetes(input_data: DiabetesInput,current_user: User = Depends(get_current_user)):
+def predict_diabetes(input_data: DiabetesInput,current_user: User = Depends(get_current_user),db: Session = Depends(get_db)):
     input_json = input_data.model_dump()
     input_json['diabetesMed'] = "Yes"
     df = pd.DataFrame([input_json])
@@ -167,7 +183,14 @@ def predict_diabetes(input_data: DiabetesInput,current_user: User = Depends(get_
 
     proba = model.predict_proba(df)[:, 1][0]
     pred = int(proba >= threshold)
-
+    log_prediction(
+        db=db,
+        user=current_user,
+        disease="diabetes",
+        input_data=input_data.dict(),
+        prediction=pred,
+        probability=proba,
+    )
     explainer = shap.Explainer(model)
     shap_values = explainer(df)
 
