@@ -8,7 +8,7 @@ def explain_with_gemini(response: dict) -> str:
     explanation = ""
 
     # Initialize Gemini Client
-    client = genai.Client(api_key=GEMINI_API_KEY)  # Replace with env var or secure loading
+    client = genai.Client(api_key=GEMINI_API_KEY)
 
     # Extract values
     prediction_label = "Readmitted" if response["prediction"] == 1 else "Not Readmitted"
@@ -27,7 +27,7 @@ def explain_with_gemini(response: dict) -> str:
 You are a medical assistant AI helping explain a hospital readmission prediction made by a machine learning model.
 
 Here is the patient's result:
-- Prediction: prediction_label
+- Prediction: {prediction_label}
 - Probability of Readmission: {round(probability * 100, 2)}%
 - Model Base Value (SHAP): {round(response['shap']['base_value'], 4)}
 

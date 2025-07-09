@@ -22,7 +22,7 @@ class PneumoniaInput(BaseModel):
 
 # === Heart Failure Input ===
 class HeartFailureInput(BaseModel):
-    Patient_ID: int
+    Patient_ID: str
     Age: int
     Gender: Literal["Female", "Male"]
     Ethnicity: Literal["Asian", "Black", "Hispanic", "Other", "White"]
@@ -45,7 +45,7 @@ class HeartFailureInput(BaseModel):
 
 # === Diabetes Input ===
 class DiabetesInput(BaseModel):
-    patient_nbr: int
+    patient_nbr: str
     time_in_hospital: float
     time_in_hospital_max: int
     num_lab_procedures: float

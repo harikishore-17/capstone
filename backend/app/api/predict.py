@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException,Depends
-from app.models.predict import PneumoniaInput,DiabetesInput,HeartFailureInput
+from app.models.predict_inputs import PneumoniaInput,DiabetesInput,HeartFailureInput
 from app.services.explanation import explain_with_gemini
 from sqlalchemy.orm import Session
 import pandas as pd
@@ -8,12 +8,25 @@ import shap
 import json
 import os
 import numpy as np
-from app.services.assign_age import get_age_bucket
 from app.services.auth_middleware import get_current_user
-from app.models.user import User
-from app.utils.logger import log_prediction
+from app.db_schema.user import User
+from app.utils.pred_logger import log_prediction
 from app.dependencies import get_db
 router = APIRouter(prefix="/predict", tags=["Prediction"])
+
+def determine_risk(predicted_class: int, probability: float) -> str:
+    if predicted_class == 1:
+        if probability >= 0.85:
+            return "High"
+        elif probability >= 0.6:
+            return "Medium"
+        else:
+            return "Low"
+    else:
+        if probability >= 0.6:
+            return "Medium"
+        else:
+            return "Low"
 
 def convert_numpy(obj):
     if isinstance(obj, (np.float32, np.float64)):
@@ -24,11 +37,18 @@ def convert_numpy(obj):
         return obj.tolist()
     return obj
 
+def get_age_bucket(age: int) -> str:
+    if age < 0 or age > 99:
+        raise ValueError("Age must be between 0 and 99")
+    lower = (age // 10) * 10
+    upper = lower + 10
+    return f"[{lower}-{upper})"
+
 @router.post("/pneumonia")
 def predict_pneumonia(input_data: PneumoniaInput,current_user: User = Depends(get_current_user),db: Session = Depends(get_db)):
     try:
         # Convert input to dict and DataFrame
-        user_data = input_data.dict()
+        user_data = input_data.model_dump()
         df = pd.DataFrame([user_data])
         df.drop(columns=["patient_id"], inplace=True)
 
@@ -69,13 +89,15 @@ def predict_pneumonia(input_data: PneumoniaInput,current_user: User = Depends(ge
         # Predict
         proba = model.predict_proba(df)[0][1]
         pred = int(proba >= threshold)
+        risk = determine_risk(pred,proba)
         log_prediction(
             db=db,
             user=current_user,
             disease="pneumonia",
-            input_data=input_data.dict(),
+            input_data=input_data.model_dump(),
             prediction=pred,
             probability=proba,
+            risk=risk
         )
 
         # SHAP explanation
@@ -85,6 +107,7 @@ def predict_pneumonia(input_data: PneumoniaInput,current_user: User = Depends(ge
         response = {
             "prediction": pred,
             "probability": round(proba, 4),
+            "risk": risk,
             "shap": {
                 "features": df.columns.tolist(),
                 "shap_values": [float(val) for val in shap_values[0]],
@@ -99,109 +122,122 @@ def predict_pneumonia(input_data: PneumoniaInput,current_user: User = Depends(ge
 
 @router.post("/heart_failure")
 def predict_heart_failure(input_data: HeartFailureInput,current_user: User = Depends(get_current_user),db: Session = Depends(get_db)):
-    raw_data = input_data.model_dump()
-    df = pd.DataFrame([raw_data])
-    encoder = joblib.load("models/model_heartfailure/encoder_heart.pkl")
-    categorical_cols = ["Gender", "Ethnicity", "Discharge_Disposition"]
-    encoded_array = encoder.transform(df[categorical_cols])
-    encoded_df = pd.DataFrame(encoded_array, columns=encoder.get_feature_names_out())
-    encoded_df.columns = [col.replace("cat__", "") for col in encoded_df.columns]
-    df = df.drop(["Patient_ID"] + categorical_cols, axis=1)
-    df = pd.concat([df.reset_index(drop=True), encoded_df.reset_index(drop=True)], axis=1)
+    try:
+        raw_data = input_data.model_dump()
+        df = pd.DataFrame([raw_data])
+        encoder = joblib.load("models/model_heartfailure/encoder_heart.pkl")
+        categorical_cols = ["Gender", "Ethnicity", "Discharge_Disposition"]
+        encoded_array = encoder.transform(df[categorical_cols])
+        encoded_df = pd.DataFrame(encoded_array, columns=encoder.get_feature_names_out())
+        encoded_df.columns = [col.replace("cat__", "") for col in encoded_df.columns]
+        df = df.drop(["Patient_ID"] + categorical_cols, axis=1)
+        df = pd.concat([df.reset_index(drop=True), encoded_df.reset_index(drop=True)], axis=1)
 
-    with open("models/model_heartfailure/feature_order.json") as f:
-        feature_order = json.load(f)
-    df = df[feature_order]
+        with open("models/model_heartfailure/feature_order.json") as f:
+            feature_order = json.load(f)
+        df = df[feature_order]
 
-    with open("models/model_heartfailure/numerical_columns.json") as f:
-        numerical_cols = json.load(f)
-    scaler = joblib.load("models/model_heartfailure/standard_scaler.pkl")
-    df[numerical_cols] = scaler.transform(df[numerical_cols])
+        with open("models/model_heartfailure/numerical_columns.json") as f:
+            numerical_cols = json.load(f)
+        scaler = joblib.load("models/model_heartfailure/standard_scaler.pkl")
+        df[numerical_cols] = scaler.transform(df[numerical_cols])
 
-    model = joblib.load("models/model_heartfailure/random_forest.pkl")
-    proba = model.predict_proba(df)[0][1]
-    pred = int(model.predict(df)[0])
-    log_prediction(
-        db=db,
-        user=current_user,
-        disease="Heart Failure",
-        input_data=input_data.dict(),
-        prediction=pred,
-        probability=proba,
-    )
-    explainer = shap.Explainer(model)
-    shap_values = explainer(df)
+        model = joblib.load("models/model_heartfailure/random_forest.pkl")
+        proba = model.predict_proba(df)[0][1]
+        pred = int(model.predict(df)[0])
+        risk = determine_risk(pred, proba)
+        log_prediction(
+            db=db,
+            user=current_user,
+            disease="Heart Failure",
+            input_data=input_data.model_dump(),
+            prediction=pred,
+            probability=proba,
+            risk=risk
+        )
+        explainer = shap.Explainer(model)
+        shap_values = explainer(df)
 
-    response = {
-        "prediction": pred,
-        "probability": round(proba, 4),
-        "shap": {
-            "features": df.columns.tolist(),
-            "shap_values": shap_values[0].values[:, 1].tolist(),  # Class 1 SHAPs
-            "base_value": float(shap_values.base_values[0][1])  # Class 1 base
+        response = {
+            "prediction": pred,
+            "probability": round(proba, 4),
+            "risk":risk,
+            "shap": {
+                "features": df.columns.tolist(),
+                "shap_values": shap_values[0].values[:, 1].tolist(),  # Class 1 SHAPs
+                "base_value": float(shap_values.base_values[0][1])  # Class 1 base
+            }
         }
-    }
-    response['explanation'] = explain_with_gemini(response)
-    return response
+        response['explanation'] = explain_with_gemini(response)
+        return response
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Prediction failed: {str(e)}")
+
 
 @router.post("/diabetes")
 def predict_diabetes(input_data: DiabetesInput,current_user: User = Depends(get_current_user),db: Session = Depends(get_db)):
-    input_json = input_data.model_dump()
-    input_json['diabetesMed'] = "Yes"
-    df = pd.DataFrame([input_json])
-    df.drop(columns=["patient_nbr"], errors="ignore", inplace=True)
+    try:
+        input_json = input_data.model_dump()
+        input_json['diabetesMed'] = "Yes"
+        df = pd.DataFrame([input_json])
+        df.drop(columns=["patient_nbr"], errors="ignore", inplace=True)
 
-    model = joblib.load("models/model_diabetics/xgb_readmission_model.joblib")
-    threshold = joblib.load("models/model_diabetics/threshold.joblib")
-    df['age'] = get_age_bucket(input_json['age'])
-    ENCODERS_DIR = "models/model_diabetics/encoders_diabetics"
-    categorical_encoders = {
-        "A1Cresult": "label_encoder_A1Cresult.joblib",
-        "age": "label_encoder_age.joblib",
-        "change": "label_encoder_change.joblib",
-        "diabetesMed": "label_encoder_diabetesMed.joblib",
-        "diag_1": "label_encoder_diag_1.joblib",
-        "diag_2": "label_encoder_diag_2.joblib",
-        "diag_3": "label_encoder_diag_3.joblib",
-        "gender": "label_encoder_gender.joblib",
-        "glipizide": "label_encoder_glipizide.joblib",
-        "glyburide": "label_encoder_glyburide.joblib",
-        "insulin": "label_encoder_insulin.joblib",
-        "max_glu_serum": "label_encoder_max_glu_serum.joblib",
-        "medical_specialty": "label_encoder_medical_specialty.joblib",
-        "metformin": "label_encoder_metformin.joblib",
-        "race": "label_encoder_race.joblib",
-    }
-    encoders = {col: joblib.load(os.path.join(ENCODERS_DIR, fname)) for col, fname in categorical_encoders.items()}
-    for col in categorical_encoders:
-        if col in df.columns:
-            val = df[col].iloc[0]
-            if pd.isnull(val) or val == "NaN":
-                val = "NaN"
-            df[col] = [val]
-            df[col] = encoders[col].transform(df[col])
-
-    proba = model.predict_proba(df)[:, 1][0]
-    pred = int(proba >= threshold)
-    log_prediction(
-        db=db,
-        user=current_user,
-        disease="diabetes",
-        input_data=input_data.dict(),
-        prediction=pred,
-        probability=proba,
-    )
-    explainer = shap.Explainer(model)
-    shap_values = explainer(df)
-
-    response = {
-        "prediction": int(pred),
-        "probability": round(float(proba), 4),
-        "shap": {
-            "features": list(df.columns),
-            "shap_values": shap_values.values[0].tolist(),
-            "base_value": convert_numpy(explainer.expected_value)
+        model = joblib.load("models/model_diabetics/xgb_readmission_model.joblib")
+        threshold = joblib.load("models/model_diabetics/threshold.joblib")
+        df['age'] = get_age_bucket(input_json['age'])
+        ENCODERS_DIR = "models/model_diabetics/encoders_diabetics"
+        categorical_encoders = {
+            "A1Cresult": "label_encoder_A1Cresult.joblib",
+            "age": "label_encoder_age.joblib",
+            "change": "label_encoder_change.joblib",
+            "diabetesMed": "label_encoder_diabetesMed.joblib",
+            "diag_1": "label_encoder_diag_1.joblib",
+            "diag_2": "label_encoder_diag_2.joblib",
+            "diag_3": "label_encoder_diag_3.joblib",
+            "gender": "label_encoder_gender.joblib",
+            "glipizide": "label_encoder_glipizide.joblib",
+            "glyburide": "label_encoder_glyburide.joblib",
+            "insulin": "label_encoder_insulin.joblib",
+            "max_glu_serum": "label_encoder_max_glu_serum.joblib",
+            "medical_specialty": "label_encoder_medical_specialty.joblib",
+            "metformin": "label_encoder_metformin.joblib",
+            "race": "label_encoder_race.joblib",
         }
-    }
-    response["explanation"] = explain_with_gemini(response)
-    return response
+        encoders = {col: joblib.load(os.path.join(ENCODERS_DIR, fname)) for col, fname in categorical_encoders.items()}
+        for col in categorical_encoders:
+            if col in df.columns:
+                val = df[col].iloc[0]
+                if pd.isnull(val) or val == "NaN":
+                    val = "NaN"
+                df[col] = [val]
+                df[col] = encoders[col].transform(df[col])
+
+        proba = model.predict_proba(df)[:, 1][0]
+        pred = int(proba >= threshold)
+        risk = determine_risk(pred, proba)
+        log_prediction(
+            db=db,
+            user=current_user,
+            disease="diabetes",
+            input_data=input_data.model_dump(),
+            prediction=pred,
+            probability=proba,
+            risk=risk
+        )
+        explainer = shap.Explainer(model)
+        shap_values = explainer(df)
+
+        response = {
+            "prediction": int(pred),
+            "probability": round(float(proba), 4),
+            "risk":risk,
+            "shap": {
+                "features": list(df.columns),
+                "shap_values": shap_values.values[0].tolist(),
+                "base_value": convert_numpy(explainer.expected_value)
+            }
+        }
+        response["explanation"] = explain_with_gemini(response)
+        return response
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Prediction failed: {str(e)}")

@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 import traceback
 
-from app.models.error_log import ErrorLog
+from app.db_schema.error_log import ErrorLog
 
 def log_error_to_db(db, endpoint: str, exc: Exception):
     error = ErrorLog(
