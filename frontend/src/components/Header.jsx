@@ -22,7 +22,7 @@ const Header = () => {
       <div>Readmission Predictor App</div>
       <div style={{ display: "flex", alignItems: "center" }}>
         <span style={{ marginRight: 15, fontSize: 16 }}>
-          Welcome, {user?.name}
+          Welcome, {user?.username}
         </span>
         <button
           onClick={logout}

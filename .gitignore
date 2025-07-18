@@ -46,3 +46,4 @@ backend/venv/
 
 # Logs
 *.log
+frontend/.env

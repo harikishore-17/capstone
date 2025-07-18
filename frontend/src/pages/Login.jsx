@@ -8,45 +8,33 @@ const Login = () => {
 
   const [form, setForm] = useState({ username: "", password: "" });
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    const result = login(form.username, form.password);
+    setLoading(true);
+    setError("");
+    const result = await login(form.username, form.password);
+    setLoading(false);
+
     if (result.success) {
-      if (result.role === "user") navigate("/");
-      else if (result.role === "admin") navigate("/admin");
+      navigate(result.role === "admin" ? "/admin" : "/");
     } else {
       setError(result.message);
     }
   };
 
   return (
-    <div
-      style={{
-        height: "100vh",
-        backgroundColor: "#f1f3f5",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        fontFamily: "sans-serif",
-      }}
-    >
-      <div
-        style={{
-          width: "100%",
-          maxWidth: 400,
-          backgroundColor: "white",
-          padding: 30,
-          borderRadius: 12,
-          boxShadow: "0 4px 20px rgba(0,0,0,0.1)",
-        }}
-      >
-        <h2 style={{ textAlign: "center", marginBottom: 25 }}>Login</h2>
-        <form onSubmit={handleSubmit}>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-100 to-gray-300 p-4">
+      <div className="w-full max-w-md bg-white p-8 rounded-2xl shadow-xl">
+        <h2 className="text-2xl font-bold text-center mb-6 text-gray-800">
+          Hospital Readmission Login
+        </h2>
+        <form onSubmit={handleSubmit} className="space-y-4">
           <input
             type="text"
             name="username"
@@ -54,14 +42,7 @@ const Login = () => {
             value={form.username}
             onChange={handleChange}
             required
-            style={{
-              width: "100%",
-              padding: "10px",
-              marginBottom: 15,
-              borderRadius: 6,
-              border: "1px solid #ccc",
-              fontSize: 14,
-            }}
+            className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
           <input
             type="password"
@@ -70,33 +51,17 @@ const Login = () => {
             value={form.password}
             onChange={handleChange}
             required
-            style={{
-              width: "100%",
-              padding: "10px",
-              marginBottom: 15,
-              borderRadius: 6,
-              border: "1px solid #ccc",
-              fontSize: 14,
-            }}
+            className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
           {error && (
-            <div style={{ color: "#dc3545", marginBottom: 15 }}>{error}</div>
+            <div className="text-red-600 text-sm text-center">{error}</div>
           )}
           <button
             type="submit"
-            style={{
-              width: "100%",
-              padding: "10px",
-              backgroundColor: "#007bff",
-              color: "white",
-              fontWeight: "bold",
-              fontSize: 16,
-              border: "none",
-              borderRadius: 6,
-              cursor: "pointer",
-            }}
+            disabled={loading}
+            className="w-full bg-blue-600 hover:bg-blue-700 transition-all text-white font-semibold py-2 rounded-lg"
           >
-            Login
+            {loading ? "Logging in..." : "Login"}
           </button>
         </form>
       </div>

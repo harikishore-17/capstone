@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import Header from "../components/Header";
 import AdminHome from "./AdminHome";
 import AllPatients from "./AllPatients";
-import UserControls from "./UserControls";
 
 const AdminDashboard = () => {
   const [selectedMenu, setSelectedMenu] = useState("home");
@@ -13,8 +12,6 @@ const AdminDashboard = () => {
         return <AdminHome />;
       case "patients":
         return <AllPatients />;
-      case "users":
-        return <UserControls />;
       default:
         return null;
     }
@@ -50,18 +47,6 @@ const AdminDashboard = () => {
                 }`}
               >
                 All Patients
-              </button>
-            </li>
-            <li>
-              <button
-                onClick={() => setSelectedMenu("users")}
-                className={`text-left w-full ${
-                  selectedMenu === "users"
-                    ? "text-blue-600 font-semibold"
-                    : "text-gray-700"
-                }`}
-              >
-                User Controls
               </button>
             </li>
           </ul>

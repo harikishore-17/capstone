@@ -99,7 +99,6 @@ def predict_pneumonia(input_data: PneumoniaInput,current_user: User = Depends(ge
             probability=proba,
             risk=risk
         )
-
         # SHAP explanation
         explainer = shap.TreeExplainer(model.named_estimators_['xgb'])
         shap_values = explainer.shap_values(df)

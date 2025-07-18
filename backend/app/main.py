@@ -1,7 +1,7 @@
 from datetime import datetime
-
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI,Request, Depends
-from app.api import predict,auth,patients
+from app.api import predict,auth,patients,tasks,escalations,notifications
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from app.utils.error_logger import log_error_to_db
@@ -13,6 +13,23 @@ app = FastAPI()
 app.include_router(predict.router)
 app.include_router(auth.router)
 app.include_router(patients.router)
+app.include_router(tasks.router)
+app.include_router(escalations.router)
+app.include_router(notifications.router)
+
+# Allow localhost frontend access
+origins = [
+    "http://localhost:3000",       # React dev server
+    "http://127.0.0.1:3000"        # Just in case
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,             #  allow frontend origin
+    allow_credentials=True,
+    allow_methods=["*"],               # allow all HTTP methods
+    allow_headers=["*"],               # allow all headers
+)
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):

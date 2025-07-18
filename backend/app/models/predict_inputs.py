@@ -71,7 +71,6 @@ class DiabetesInput(BaseModel):
     A1Cresult: Literal[">7", ">8", "Norm", "Unknown"]
     insulin: Literal["Down", "No", "Steady", "Up"]
     change: Literal["Ch", "No"]
-    diabetesMed: Literal["Yes", "No"]
     medical_specialty: Literal[
         "Cardiology", "Emergency/Trauma", "Family/GeneralPractice", "InternalMedicine",
         "Nephrology", "Orthopedics", "Orthopedics-Reconstructive", "Other",
