@@ -56,4 +56,4 @@ class PatientDetails(BaseModel):
     disease_type: str
     clinical_info: dict
     follow_ups: List[FollowUpSchema]
-    prediction: PredictionSummary
+    prediction: Optional[PredictionSummary]

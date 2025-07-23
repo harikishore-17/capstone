@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Column, String, UUID, text, DateTime
+from sqlalchemy import Column, String, UUID, text, DateTime, Boolean
 from app.db import Base
 
 class User(Base):
@@ -12,3 +12,4 @@ class User(Base):
     hashed_password = Column(String, nullable=False)
     role = Column(String, default="user", nullable=False)  # Optional: validate against enum
     created_at = Column(DateTime, default=datetime.utcnow)
+    must_change_password = Column(Boolean,default=False,nullable=False)

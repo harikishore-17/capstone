@@ -22,7 +22,7 @@ class PneumoniaInput(BaseModel):
 
 # === Heart Failure Input ===
 class HeartFailureInput(BaseModel):
-    Patient_ID: str
+    patient_id: str
     Age: int
     Gender: Literal["Female", "Male"]
     Ethnicity: Literal["Asian", "Black", "Hispanic", "Other", "White"]
@@ -45,7 +45,7 @@ class HeartFailureInput(BaseModel):
 
 # === Diabetes Input ===
 class DiabetesInput(BaseModel):
-    patient_nbr: str
+    patient_id: str
     time_in_hospital: float
     time_in_hospital_max: int
     num_lab_procedures: float
@@ -71,6 +71,7 @@ class DiabetesInput(BaseModel):
     A1Cresult: Literal[">7", ">8", "Norm", "Unknown"]
     insulin: Literal["Down", "No", "Steady", "Up"]
     change: Literal["Ch", "No"]
+    diabetesMed:str
     medical_specialty: Literal[
         "Cardiology", "Emergency/Trauma", "Family/GeneralPractice", "InternalMedicine",
         "Nephrology", "Orthopedics", "Orthopedics-Reconstructive", "Other",

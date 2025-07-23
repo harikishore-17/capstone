@@ -3,11 +3,12 @@ from sqlalchemy.orm import Session
 from app.db_schema.user import User
 from app.dependencies import get_db
 from passlib.context import CryptContext
-from app.models.user import UserCreate,TokenResponse
+from app.models.user import UserCreate,TokenResponse,UserPasswordChange
 from app.utils.audit_logs import log_action
 from app.utils.jwt import create_access_token
-from app.services.auth_middleware import get_current_admin_user
+from app.services.auth_middleware import get_current_admin_user,get_current_user
 from fastapi.security import OAuth2PasswordRequestForm
+from sqlalchemy.orm.attributes import flag_modified
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
@@ -20,7 +21,7 @@ def register_user(data:UserCreate , db: Session = Depends(get_db),current_user: 
         raise HTTPException(status_code=400, detail="Username already exists")
 
     hashed_pw = pwd_context.hash(data.password)
-    new_user = User(username=data.username, hashed_password=hashed_pw, role=data.role,email=data.email)
+    new_user = User(username=data.username, hashed_password=hashed_pw, role=data.role,email=data.email,must_change_password=True)
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
@@ -34,8 +35,23 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
         raise HTTPException(status_code=400, detail="Invalid credentials")
     log_action(db, user_id=user.id, action="login_success", endpoint="/auth/login",
                payload={"username": user.username})
-    access_token = create_access_token(data={"sub": str(user.id), "role": user.role, "username": user.username})
+    access_token = create_access_token(data={"sub": str(user.id), "role": user.role, "username": user.username,'must_change_password':user.must_change_password})
     return {"access_token": access_token, "token_type": "bearer"}
+
+@router.put('/changePassword')
+def change_password(payload:UserPasswordChange,db:Session = Depends(get_db),current_user:User = Depends(get_current_user)):
+    user = db.query(User).filter(User.id == current_user.id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found in session.")
+
+    if not pwd_context.verify(payload.oldPassword, user.hashed_password):
+        raise HTTPException(status_code=400, detail="Incorrect current password")
+    user.hashed_password = pwd_context.hash(payload.newPassword)
+    user.must_change_password = False
+    db.commit()
+    db.refresh(user)
+
+    return {"message": "Password updated successfully!"}
 
 
 @router.post("/delete")

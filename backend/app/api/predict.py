@@ -129,7 +129,7 @@ def predict_heart_failure(input_data: HeartFailureInput,current_user: User = Dep
         encoded_array = encoder.transform(df[categorical_cols])
         encoded_df = pd.DataFrame(encoded_array, columns=encoder.get_feature_names_out())
         encoded_df.columns = [col.replace("cat__", "") for col in encoded_df.columns]
-        df = df.drop(["Patient_ID"] + categorical_cols, axis=1)
+        df = df.drop(["patient_id"] + categorical_cols, axis=1)
         df = pd.concat([df.reset_index(drop=True), encoded_df.reset_index(drop=True)], axis=1)
 
         with open("models/model_heartfailure/feature_order.json") as f:
@@ -177,9 +177,9 @@ def predict_heart_failure(input_data: HeartFailureInput,current_user: User = Dep
 def predict_diabetes(input_data: DiabetesInput,current_user: User = Depends(get_current_user),db: Session = Depends(get_db)):
     try:
         input_json = input_data.model_dump()
-        input_json['diabetesMed'] = "Yes"
+       # input_json['diabetesMed'] = "Yes"
         df = pd.DataFrame([input_json])
-        df.drop(columns=["patient_nbr"], errors="ignore", inplace=True)
+        df.drop(columns=["patient_id"], errors="ignore", inplace=True)
 
         model = joblib.load("models/model_diabetics/xgb_readmission_model.joblib")
         threshold = joblib.load("models/model_diabetics/threshold.joblib")

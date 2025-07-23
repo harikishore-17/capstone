@@ -1,5 +1,5 @@
 from typing import List
-
+from sqlalchemy.orm.attributes import flag_modified
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.dependencies import get_db
@@ -34,7 +34,10 @@ def mark_notification_as_read(
         raise HTTPException(status_code=404, detail="Notification not found")
 
     if current_user.id not in notif.read_by:
+
         notif.read_by.append(current_user.id)
+        flag_modified(notif, "read_by")
         db.commit()
+        db.refresh(notif)
 
     return {"message": "Marked as read"}

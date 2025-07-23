@@ -5,7 +5,9 @@ class UserCreate(BaseModel):
     email: EmailStr
     password: str
     role:str
-
+class UserPasswordChange(BaseModel):
+    oldPassword:str
+    newPassword:str
 class UserOut(BaseModel):
     id: int
     username: str
