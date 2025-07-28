@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 from datetime import datetime,date
 from typing import Literal, List, Optional
-
+from app.models.escalation import EscalationSchema
 
 class PredictionSummary(BaseModel):
     risk:str
@@ -57,3 +57,4 @@ class PatientDetails(BaseModel):
     clinical_info: dict
     follow_ups: List[FollowUpSchema]
     prediction: Optional[PredictionSummary]
+    escalations: List[EscalationSchema]

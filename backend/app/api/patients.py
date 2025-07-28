@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.db_schema.user import User
 from app.db_schema.tasks import Task
 from app.dependencies import get_db
+from app.models.escalation import EscalationSchema
 from app.services.auth_middleware import get_current_user, get_current_admin_user
 from app.db_schema.patient_related import Assignment, PatientReference
 from app.db_schema.predicition import Prediction
@@ -163,7 +164,12 @@ def get_patient_details(
         .order_by(Prediction.timestamp.desc())
         .first()
     )
-
+    escalations = (
+        db.query(Escalation)
+        .filter(Escalation.patient_id == patient_id)
+        .order_by(Escalation.updated_at.desc())
+        .all()
+    )
     return PatientDetails(
         patient_id=patient.patient_id,
         name=patient.name,
@@ -187,7 +193,9 @@ def get_patient_details(
             risk=latest_prediction.risk,
             predicted_probability=latest_prediction.predicted_probability,
             prediction_class=str(latest_prediction.predicted_class)
-        ) if latest_prediction else None
+        ) if latest_prediction else None,
+        escalations=[EscalationSchema.from_orm(esc) for esc in escalations]
+
     )
 
 
