@@ -20,7 +20,11 @@ export const AuthProvider = ({ children }) => {
       const formData = new URLSearchParams();
       formData.append("username", username);
       formData.append("password", password);
-
+      if (!BASE_URL) {
+        console.error("API Base URL is not defined. Check your .env file.");
+        console.log("API Base URL is not defined. Check your .env file.");
+        return { success: false, message: "API Base URL is not defined." };
+      }
       const response = await fetch(`${BASE_URL}/auth/login`, {
         method: "POST",
         headers: {
@@ -44,10 +48,16 @@ export const AuthProvider = ({ children }) => {
         role: payload.role,
         id: payload.sub,
         exp: payload.exp,
+        must_change_password: payload.must_change_password,
       };
 
       setUser(userData);
-      return { success: true, role: userData.role };
+      const redirectPath = userData.must_change_password
+        ? "/change-password"
+        : userData.role === "admin"
+        ? "/admin"
+        : "/";
+      return { success: true, role: userData.role, redirectPath };
     } catch (err) {
       return { success: false, message: "Server error. Try again later." };
     }

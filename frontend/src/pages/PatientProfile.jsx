@@ -1,14 +1,38 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { FaEdit } from "react-icons/fa";
-import { MdSave, MdCancel } from "react-icons/md";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  User,
+  Edit,
+  Save,
+  X,
+  ClipboardList,
+  Stethoscope,
+  AlertTriangle,
+  CalendarDays,
+  MessageSquare,
+  Phone,
+  Home as HomeIcon,
+  Monitor,
+  ArrowLeft,
+  Flag,
+} from "lucide-react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "../components/ui/card";
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
 import { useGlobalContext } from "../context/GlobalContext";
+
 const PatientProfile = () => {
   const { patientId } = useParams();
   const navigate = useNavigate();
-  const { patients } = useGlobalContext();
+  const { patients, refreshData } = useGlobalContext();
   const [selectedTab, setSelectedTab] = useState("followups");
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [patient, setPatient] = useState(null);
   const [editingRisk, setEditingRisk] = useState(false);
   const [newRisk, setNewRisk] = useState("");
@@ -16,14 +40,14 @@ const PatientProfile = () => {
   const [followUpEdits, setFollowUpEdits] = useState({});
   const token = JSON.parse(localStorage.getItem("user"))?.token;
   const currentUser = JSON.parse(localStorage.getItem("user"));
-  let isAssignedUser = false;
-  if (patient) {
-    const curr_patient = patients.find((p) => p.id === patient.id);
-    isAssignedUser = curr_patient?.assigned_user_id === currentUser?.id;
-  }
   const [riskChangeDescription, setRiskChangeDescription] = useState("");
-
   const BASE_URL = process.env.REACT_APP_API_BASE_URL;
+
+  const currentPatientFromContext = patients.find(
+    (p) => p.patient_id === patientId
+  );
+  const isAssignedUser =
+    currentPatientFromContext?.assigned_user_id === currentUser?.id;
 
   useEffect(() => {
     const fetchPatient = async () => {
@@ -42,16 +66,33 @@ const PatientProfile = () => {
     };
 
     fetchPatient();
-  }, [patientId, refreshTrigger]);
+  }, [patientId, token, BASE_URL, navigate]);
 
-  const getStatusColor = (status) => {
+  const getRiskColorClass = (risk) => {
+    // Corrected for dark mode visibility
+    switch (risk?.toLowerCase()) {
+      case "high":
+        return "bg-red-100 text-red-700 border-red-300 dark:bg-red-900/40 dark:text-red-300 dark:border-red-700";
+      case "medium":
+        return "bg-yellow-100 text-yellow-700 border-yellow-300 dark:bg-yellow-900/40 dark:text-yellow-300 dark:border-yellow-700";
+      case "low":
+        return "bg-green-100 text-green-700 border-green-300 dark:bg-green-900/40 dark:text-green-300 dark:border-green-700";
+      default:
+        return "bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-700/40 dark:text-gray-300 dark:border-gray-600";
+    }
+  };
+
+  const getFollowUpStatusColorClass = (status) => {
+    // Corrected for dark mode visibility
     switch (status) {
       case "completed":
-        return "#28a745";
+        return "border-green-500 bg-green-50 dark:bg-slate-800";
       case "upcoming":
-        return "#17a2b8";
+        return "border-blue-500 bg-blue-50 dark:bg-slate-800";
+      case "pending":
+        return "border-yellow-500 bg-yellow-50 dark:bg-slate-800";
       default:
-        return "#ffc107";
+        return "border-gray-500 bg-gray-50 dark:bg-slate-800";
     }
   };
 
@@ -64,17 +105,18 @@ const PatientProfile = () => {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          ...followUpEdits[id],
-          ...updated,
-        }),
+        body: JSON.stringify({ ...updated }),
       });
-
       if (!res.ok) throw new Error("Update failed");
-
       alert("Follow-up updated successfully.");
       setEditingFollowUpId(null);
-      setRefreshTrigger((prev) => prev + 1);
+      const updatedPatientRes = await fetch(
+        `${BASE_URL}/patients/${patientId}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      const updatedPatientData = await updatedPatientRes.json();
+      setPatient(updatedPatientData);
+      refreshData();
     } catch (err) {
       console.error(err);
       alert("Failed to update follow-up.");
@@ -88,461 +130,577 @@ const PatientProfile = () => {
     }));
   };
 
-  if (!patient) return <div style={{ padding: 30 }}>Loading...</div>;
+  const handleSubmitRiskChange = async () => {
+    if (!riskChangeDescription.trim()) {
+      alert("Please provide a detailed explanation.");
+      return;
+    }
+    try {
+      const res = await fetch(`${BASE_URL}/escalations/create`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          patient_id: patient.patient_id,
+          old_risk: patient.prediction?.risk,
+          new_risk: newRisk,
+          description: riskChangeDescription,
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to submit escalation.");
+      alert("Escalation submitted successfully.");
+      setEditingRisk(false);
+      setRiskChangeDescription("");
+      refreshData();
+    } catch (err) {
+      console.error(err);
+      alert("Failed to submit escalation.");
+    }
+  };
+
+  if (!patient)
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-900">
+        <div className="flex items-center space-x-3 text-gray-600 dark:text-gray-300">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
+          <span className="text-lg">Loading patient data...</span>
+        </div>
+      </div>
+    );
+
+  // Replace the entire return statement in your PatientProfile component with this
 
   return (
-    <div style={{ padding: "30px 20px", maxWidth: 1000, margin: "0 auto" }}>
-      <button
-        onClick={() => navigate(-1)}
-        style={{
-          marginBottom: 20,
-          backgroundColor: "#6c757d",
-          color: "white",
-          border: "none",
-          padding: "6px 12px",
-          borderRadius: 4,
-          cursor: "pointer",
-        }}
-      >
-        ← Back
-      </button>
-
-      <h2 style={{ marginBottom: 10, color: "#343a40" }}>{patient.name}</h2>
-
-      {/* Basic Info */}
-      <div
-        style={{
-          backgroundColor: "#f8f9fa",
-          padding: 24,
-          borderRadius: 10,
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-          gap: 20,
-          marginBottom: 30,
-          boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
-        }}
-      >
-        <div>
-          <strong>Age:</strong> {patient.age}
-        </div>
-        <div>
-          <strong>Gender:</strong> {patient.gender}
-        </div>
-        <div>
-          <strong>Phone:</strong> {patient.mobile_number}
-        </div>
-        <div>
-          <strong>Disease:</strong> {patient.disease_type}
-        </div>
-        <div style={{ display: "flex", alignItems: "center" }}>
-          <strong>Risk:</strong>&nbsp;
-          {patient.prediction?.risk || "N/A"}
-          {isAssignedUser && (
-            <FaEdit
-              onClick={() => setEditingRisk(true)}
-              style={{ marginLeft: 8, color: "#007bff", cursor: "pointer" }}
-            />
-          )}
-        </div>
-      </div>
-
-      {/* Prediction */}
-      <div
-        style={{
-          backgroundColor: "#ffffff",
-          padding: 24,
-          marginBottom: 30,
-          borderRadius: 10,
-          boxShadow: "0 2px 10px rgba(0,0,0,0.08)",
-        }}
-      >
-        <h3>Latest Prediction</h3>
-        {patient.prediction ? (
-          <ul style={{ padding: 0, listStyle: "none", fontSize: 16 }}>
-            <li>
-              <strong>Risk:</strong> {patient.prediction.risk}
-            </li>
-            <li>
-              <strong>Probability:</strong>{" "}
-              {(patient.prediction.predicted_probability * 100).toFixed(1)}%
-            </li>
-            <li>
-              <strong>Class:</strong> {patient.prediction.prediction_class}
-            </li>
-          </ul>
-        ) : (
-          <p style={{ color: "#6c757d" }}>No prediction data available.</p>
-        )}
-      </div>
-
-      {/* Tabs */}
-      <div style={{ display: "flex", marginBottom: 20 }}>
-        {["followups", "clinical"].map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setSelectedTab(tab)}
-            style={{
-              padding: "10px 20px",
-              fontWeight: "bold",
-              fontSize: 16,
-              border: "none",
-              backgroundColor: "transparent",
-              borderBottom:
-                selectedTab === tab
-                  ? "3px solid #007bff"
-                  : "3px solid transparent",
-              color: selectedTab === tab ? "#007bff" : "#6c757d",
-              cursor: "pointer",
-              marginRight: 15,
-            }}
-          >
-            {tab === "followups" ? "Follow Ups" : "Clinical Data"}
-          </button>
-        ))}
-      </div>
-
-      {/* Follow Ups */}
-      {selectedTab === "followups" && (
-        <div>
-          {patient.follow_ups?.length > 0 ? (
-            patient.follow_ups.map((fup) => {
-              const isEditing = editingFollowUpId === fup.id;
-              const color = getStatusColor(fup.status);
-
-              return (
-                <div
-                  key={fup.id}
-                  style={{
-                    position: "relative",
-                    backgroundColor: "#ffffff",
-                    padding: 20,
-                    borderLeft: `5px solid ${color}`,
-                    marginBottom: 16,
-                    borderRadius: 10,
-                    boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
-                  }}
-                >
-                  {/* Edit icon */}
-                  {isAssignedUser &&
-                    fup.status !== "completed" &&
-                    !isEditing && (
-                      <FaEdit
-                        onClick={() => {
-                          setEditingFollowUpId(fup.id);
-                          setFollowUpEdits({
-                            ...followUpEdits,
-                            [fup.id]: {
-                              notes: fup.notes,
-                              status: fup.status,
-                              follow_up_date: fup.follow_up_date,
-                            },
-                          });
-                        }}
-                        style={{
-                          position: "absolute",
-                          top: 12,
-                          right: 12,
-                          color: "#007bff",
-                          cursor: "pointer",
-                        }}
-                      />
-                    )}
-
-                  {isEditing ? (
-                    <>
-                      <div>
-                        <strong>Date:</strong>{" "}
-                        <input
-                          type="date"
-                          value={followUpEdits[fup.id]?.follow_up_date}
-                          onChange={(e) =>
-                            handleChange(
-                              fup.id,
-                              "follow_up_date",
-                              e.target.value
-                            )
-                          }
-                          style={{
-                            marginTop: 4,
-                            padding: 6,
-                            border: "1px solid #ccc",
-                            borderRadius: 4,
-                          }}
-                        />
-                      </div>
-                      <div style={{ marginTop: 10 }}>
-                        <strong>Type:</strong>{" "}
-                        <select
-                          value={followUpEdits[fup.id]?.follow_up_type}
-                          onChange={(e) =>
-                            handleChange(
-                              fup.id,
-                              "follow_up_type",
-                              e.target.value
-                            )
-                          }
-                          style={{
-                            padding: 6,
-                            marginLeft: 6,
-                            border: "1px solid #ccc",
-                            borderRadius: 4,
-                          }}
-                        >
-                          <option value="phone">Phone</option>
-                          <option value="onsite">Onsite</option>
-                          <option value="virtual">Virtual</option>
-                        </select>
-                      </div>
-
-                      <div style={{ marginTop: 10 }}>
-                        <strong>Notes:</strong>
-                        <textarea
-                          value={followUpEdits[fup.id]?.notes}
-                          onChange={(e) =>
-                            handleChange(fup.id, "notes", e.target.value)
-                          }
-                          rows={3}
-                          style={{
-                            width: "100%",
-                            marginTop: 4,
-                            padding: 8,
-                            border: "1px solid #ccc",
-                            borderRadius: 4,
-                          }}
-                        />
-                      </div>
-
-                      <div style={{ marginTop: 10 }}>
-                        <strong>Status:</strong>{" "}
-                        <select
-                          value={followUpEdits[fup.id]?.status}
-                          onChange={(e) =>
-                            handleChange(fup.id, "status", e.target.value)
-                          }
-                          style={{
-                            padding: 6,
-                            marginLeft: 6,
-                            border: "1px solid #ccc",
-                            borderRadius: 4,
-                          }}
-                        >
-                          <option value="pending">Pending</option>
-                          <option value="upcoming">Upcoming</option>
-                          <option value="completed">Completed</option>
-                        </select>
-                      </div>
-                      <div style={{ marginTop: 16, textAlign: "right" }}>
-                        <button
-                          onClick={() => setEditingFollowUpId(null)}
-                          style={{
-                            marginRight: 10,
-                            padding: "6px 12px",
-                            backgroundColor: "#6c757d",
-                            color: "white",
-                            border: "none",
-                            borderRadius: 4,
-                            cursor: "pointer",
-                          }}
-                        >
-                          <MdCancel style={{ verticalAlign: "middle" }} />{" "}
-                          Cancel
-                        </button>
-                        <button
-                          onClick={() => handleSaveEdit(fup.id)}
-                          style={{
-                            padding: "6px 12px",
-                            backgroundColor: "#28a745",
-                            color: "white",
-                            border: "none",
-                            borderRadius: 4,
-                            cursor: "pointer",
-                          }}
-                        >
-                          <MdSave style={{ verticalAlign: "middle" }} /> Save
-                        </button>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <div>
-                        <strong>Date:</strong> {fup.follow_up_date}
-                      </div>
-                      <div>
-                        <strong>Type:</strong> {fup.follow_up_type}
-                      </div>
-                      <div>
-                        <strong>Notes:</strong> {fup.notes}
-                      </div>
-                      <div>
-                        <strong>Status:</strong>{" "}
-                        <span style={{ color, fontWeight: "bold" }}>
-                          {fup.status}
-                        </span>
-                      </div>
-                    </>
-                  )}
-                </div>
-              );
-            })
-          ) : (
-            <p>No follow-ups recorded.</p>
-          )}
-        </div>
-      )}
-
-      {/* Clinical Data */}
-      {selectedTab === "clinical" && patient.clinical_info && (
-        <div
-          style={{
-            backgroundColor: "#ffffff",
-            padding: 24,
-            borderRadius: 10,
-            boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
-          }}
+    // 1. NEW WRAPPER: This div now handles the full-page background
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-purple-900 dark:to-indigo-900">
+      {/* 2. INNER CONTAINER: Your original div, now just for content layout */}
+      <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-8">
+        <Button
+          onClick={() => navigate(-1)}
+          variant="outline"
+          className="mb-6 bg-white/80 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700"
         >
-          <h3 style={{ marginBottom: 15 }}>Clinical Details</h3>
-          <ul style={{ padding: 0, listStyle: "none", fontSize: 16 }}>
-            {Object.entries(patient.clinical_info).map(([key, value]) => (
-              <li key={key}>
-                <strong>{key.replace(/_/g, " ")}:</strong> {value}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back to Dashboard
+        </Button>
 
-      {/* Risk Modal */}
-      {editingRisk && (
-        <div
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            width: "100vw",
-            height: "100vh",
-            backgroundColor: "rgba(0,0,0,0.5)",
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            zIndex: 999,
-          }}
-        >
-          <div
-            style={{
-              background: "#fff",
-              padding: 30,
-              borderRadius: 10,
-              width: 450,
-              boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
-            }}
-          >
-            <h3 style={{ marginBottom: 15 }}>
-              Request Risk Change from{" "}
-              <span style={{ color: "#dc3545" }}>
-                {patient.prediction?.risk}
-              </span>{" "}
-              to <span style={{ color: "#28a745" }}>{newRisk}</span>
-            </h3>
-
-            <label
-              style={{ fontWeight: "bold", display: "block", marginBottom: 6 }}
-            >
-              New Risk
-            </label>
-            <select
-              value={newRisk}
-              onChange={(e) => setNewRisk(e.target.value)}
-              style={{
-                width: "100%",
-                padding: 8,
-                marginBottom: 20,
-                borderRadius: 6,
-                border: "1px solid #ccc",
-              }}
-            >
-              <option value="low">Low</option>
-              <option value="medium">Medium</option>
-              <option value="high">High</option>
-            </select>
-
-            <label
-              style={{ fontWeight: "bold", display: "block", marginBottom: 6 }}
-            >
-              Description <span style={{ color: "red" }}>*</span>
-            </label>
-            <textarea
-              value={riskChangeDescription}
-              onChange={(e) => setRiskChangeDescription(e.target.value)}
-              rows={3}
-              required
-              style={{
-                width: "100%",
-                padding: 8,
-                marginBottom: 20,
-                borderRadius: 6,
-                border: "1px solid #ccc",
-              }}
-            />
-
-            <div
-              style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}
-            >
-              <button
-                onClick={() => setEditingRisk(false)}
-                style={{
-                  padding: "8px 16px",
-                  backgroundColor: "#6c757d",
-                  color: "#fff",
-                  border: "none",
-                  borderRadius: 6,
-                  cursor: "pointer",
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                disabled={!riskChangeDescription.trim()}
-                onClick={async () => {
-                  try {
-                    const res = await fetch(`${BASE_URL}/escalations/create`, {
-                      method: "POST",
-                      headers: {
-                        "Content-Type": "application/json",
-                        Authorization: `Bearer ${token}`,
-                      },
-                      body: JSON.stringify({
-                        patient_id: patient.patient_id,
-                        old_risk: patient.prediction?.risk,
-                        new_risk: newRisk,
-                        description: riskChangeDescription,
-                      }),
-                    });
-                    if (!res.ok) throw new Error("Failed");
-                    alert("Escalation submitted successfully.");
-                    setEditingRisk(false);
-                    setRiskChangeDescription("");
-                  } catch (err) {
-                    console.error(err);
-                    alert("Failed to submit escalation.");
-                  }
-                }}
-                style={{
-                  padding: "8px 16px",
-                  backgroundColor: "#28a745",
-                  color: "#fff",
-                  border: "none",
-                  borderRadius: 6,
-                  cursor: "pointer",
-                  fontWeight: "bold",
-                }}
-              >
-                Submit
-              </button>
+        <Card className="border-0 shadow-2xl bg-white/80 dark:bg-slate-900/70 dark:backdrop-blur-lg dark:border dark:border-slate-700/50">
+          <CardHeader className="flex flex-col md:flex-row items-start md:items-center justify-between pb-4 gap-4">
+            <div className="flex items-center space-x-4">
+              <div className="p-3 bg-gradient-to-br from-purple-600 to-blue-600 rounded-xl">
+                <User className="h-8 w-8 text-white" />
+              </div>
+              <div>
+                <CardTitle className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-blue-500">
+                  {patient.name}
+                </CardTitle>
+                <CardDescription className="text-gray-600 dark:text-gray-400 text-lg">
+                  Patient ID: {patient.patient_id}
+                </CardDescription>
+              </div>
             </div>
+            <div className="w-full md:w-auto">
+              <InfoCard
+                label="Current Risk Level"
+                value={patient.prediction?.risk || "N/A"}
+                color="red"
+                trailingItem={
+                  isAssignedUser &&
+                  patient.prediction?.risk && (
+                    <Button
+                      onClick={() => setEditingRisk(true)}
+                      variant="ghost"
+                      size="icon"
+                      className="text-blue-500 hover:bg-blue-500/10 dark:hover:bg-blue-500/20 rounded-full"
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                  )
+                }
+              />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <InfoCard label="Age" value={patient.age} color="gray" />
+              <InfoCard label="Gender" value={patient.gender} color="gray" />
+              <InfoCard
+                label="Phone"
+                value={patient.mobile_number}
+                color="gray"
+              />
+              <InfoCard
+                label="Disease"
+                value={patient.disease_type}
+                color="gray"
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-0 shadow-2xl bg-white/80 dark:bg-slate-900/70 dark:backdrop-blur-lg dark:border dark:border-slate-700/50">
+          <CardHeader className="pb-4">
+            <div className="flex items-center space-x-3">
+              <div className="p-3 bg-gradient-to-br from-indigo-500 to-cyan-500 rounded-xl">
+                <AlertTriangle className="h-6 w-6 text-white" />
+              </div>
+              <CardTitle className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-indigo-500 to-cyan-500">
+                Latest Prediction Details
+              </CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {patient.prediction ? (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <InfoCard
+                  label="Risk Level"
+                  value={patient.prediction.risk}
+                  color="red"
+                />
+                <InfoCard
+                  label="Probability"
+                  value={`${(
+                    patient.prediction.predicted_probability * 100
+                  ).toFixed(1)}%`}
+                  color="blue"
+                />
+                <InfoCard
+                  label="Classification"
+                  value={patient.prediction.prediction_class}
+                  color="green"
+                />
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                <p className="text-lg">
+                  No prediction data available for this patient.
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="border-0 shadow-2xl bg-white/80 dark:bg-slate-900/70 dark:backdrop-blur-lg dark:border dark:border-slate-700/50 overflow-hidden">
+          <div className="flex border-b border-gray-200 dark:border-gray-600">
+            {[
+              { id: "followups", label: "Follow Ups", icon: ClipboardList },
+              { id: "clinical", label: "Clinical Data", icon: Stethoscope },
+              { id: "escalations", label: "Escalations", icon: Flag },
+            ].map(({ id, label, icon: Icon }) => (
+              <button
+                key={id}
+                onClick={() => setSelectedTab(id)}
+                className={`flex-1 px-4 py-3 font-semibold text-base transition-all duration-200 flex items-center justify-center gap-2 ${
+                  selectedTab === id
+                    ? "bg-gradient-to-r from-purple-500 to-blue-500 text-white shadow-inner"
+                    : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50"
+                }`}
+              >
+                <Icon className="h-5 w-5" />
+                <span>{label}</span>
+              </button>
+            ))}
+          </div>
+
+          <CardContent className="p-6 md:p-8">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={selectedTab}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+              >
+                {selectedTab === "followups" && (
+                  <div className="space-y-6">
+                    {patient.follow_ups?.length > 0 ? (
+                      patient.follow_ups.map((fup) => (
+                        <FollowUpCard
+                          key={fup.id}
+                          fup={fup}
+                          isAssignedUser={isAssignedUser}
+                          editingFollowUpId={editingFollowUpId}
+                          setEditingFollowUpId={setEditingFollowUpId}
+                          followUpEdits={followUpEdits}
+                          setFollowUpEdits={setFollowUpEdits}
+                          handleChange={handleChange}
+                          handleSaveEdit={handleSaveEdit}
+                          getFollowUpStatusColorClass={
+                            getFollowUpStatusColorClass
+                          }
+                        />
+                      ))
+                    ) : (
+                      <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+                        <p className="text-lg">No follow-ups recorded.</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+                {selectedTab === "clinical" && (
+                  <div>
+                    {patient.clinical_info ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {Object.entries(patient.clinical_info).map(
+                          ([key, value]) => (
+                            <InfoCard
+                              key={key}
+                              label={key.replace(/_/g, " ")}
+                              value={value || "N/A"}
+                              color="gray"
+                            />
+                          )
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-center py-12 text-gray-500 dark:text-gray-400">
+                        No clinical data available.
+                      </p>
+                    )}
+                  </div>
+                )}
+                {selectedTab === "escalations" && (
+                  <div className="space-y-6">
+                    {patient.escalations?.length > 0 ? (
+                      patient.escalations.map((esc, index) => (
+                        <div
+                          key={esc.id || index}
+                          className="p-4 border rounded-lg shadow-sm bg-white dark:bg-slate-800 border-gray-200 dark:border-gray-700"
+                        >
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <InfoCard
+                              label="Status"
+                              value={esc.status}
+                              color="blue"
+                            />
+                            <InfoCard
+                              label="Old Risk"
+                              value={esc.old_risk}
+                              color="yellow"
+                            />
+                            <InfoCard
+                              label="New Risk"
+                              value={esc.new_risk}
+                              color="red"
+                            />
+                            <InfoCard
+                              label="Reason"
+                              value={esc.rejection_note || "N/A"}
+                              color="gray"
+                            />
+                            <InfoCard
+                              label="Last Updated"
+                              value={new Date(esc.updated_at).toLocaleString()}
+                              color="gray"
+                            />
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+                        <p>No escalations found for this patient.</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </motion.div>
+            </AnimatePresence>
+          </CardContent>
+        </Card>
+
+        <AnimatePresence>
+          {editingRisk && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/60 flex justify-center items-center z-50 backdrop-blur-sm"
+            >
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden border border-gray-200 dark:border-gray-700"
+              >
+                <div className="bg-gradient-to-r from-red-500 to-orange-500 px-6 py-4">
+                  <h3 className="text-xl font-bold text-white">
+                    Request Risk Change
+                  </h3>
+                  <p className="text-red-100 text-sm mt-1">
+                    From{" "}
+                    <span className="font-bold">
+                      {patient.prediction?.risk}
+                    </span>{" "}
+                    to <span className="font-bold">{newRisk}</span>
+                  </p>
+                </div>
+
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    handleSubmitRiskChange();
+                  }}
+                  className="p-6 space-y-6"
+                >
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-400 mb-2">
+                      New Risk Level
+                    </label>
+                    <select
+                      value={newRisk}
+                      onChange={(e) => setNewRisk(e.target.value)}
+                      className="w-full px-4 py-3 rounded-xl border-gray-300 dark:border-gray-600 dark:bg-gray-900/50 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-red-500"
+                    >
+                      <option value="Low">🟢 Low</option>
+                      <option value="Medium">🟡 Medium</option>
+                      <option value="High">🔴 High</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-400 mb-2">
+                      Description <span className="text-red-500">*</span>
+                    </label>
+                    <textarea
+                      value={riskChangeDescription}
+                      onChange={(e) => setRiskChangeDescription(e.target.value)}
+                      rows={4}
+                      required
+                      placeholder="Provide a detailed clinical justification for this change..."
+                      className="w-full px-4 py-3 rounded-xl border-gray-300 dark:border-gray-600 dark:bg-gray-900/50 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-red-500 resize-vertical"
+                    />
+                  </div>
+
+                  <div className="flex justify-end space-x-3 pt-4">
+                    <Button
+                      onClick={() => setEditingRisk(false)}
+                      variant="outline"
+                      className="dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-300 dark:border-gray-600"
+                    >
+                      <X className="h-4 w-4 mr-2" />
+                      <span>Cancel</span>
+                    </Button>
+                    <Button
+                      type="submit"
+                      disabled={!riskChangeDescription.trim()}
+                      className="bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600 text-white font-semibold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Save className="h-4 w-4 mr-2" />
+                      <span>Submit Request</span>
+                    </Button>
+                  </div>
+                </form>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </div>
+  );
+};
+
+// Refactored InfoCard for better consistency and dark mode styling
+const InfoCard = ({ label, value, color, trailingItem }) => {
+  const colorStyles = {
+    purple: "dark:border-purple-500 dark:text-purple-400",
+    blue: "dark:border-blue-500 dark:text-blue-400",
+    green: "dark:border-green-500 dark:text-green-400",
+    red: "dark:border-red-500 dark:text-red-400",
+    yellow: "dark:border-yellow-500 dark:text-yellow-400",
+    gray: "dark:border-gray-600 dark:text-gray-400",
+  };
+
+  const lightColorStyles = {
+    purple: "border-purple-200 text-purple-600 bg-purple-50",
+    blue: "border-blue-200 text-blue-600 bg-blue-50",
+    green: "border-green-200 text-green-600 bg-green-50",
+    red: "border-red-200 text-red-600 bg-red-50",
+    yellow: "border-yellow-200 text-yellow-600 bg-yellow-50",
+    gray: "border-gray-200 text-gray-600 bg-gray-50",
+  };
+
+  const darkClass = colorStyles[color] || colorStyles.gray;
+  const lightClass = lightColorStyles[color] || lightColorStyles.gray;
+
+  return (
+    <div
+      className={`p-4 rounded-xl border dark:bg-slate-800 dark:border-transparent dark:border-l-4 ${darkClass} ${lightClass}`}
+    >
+      <div className="flex justify-between items-start">
+        <div>
+          <div className="text-sm font-medium mb-1 capitalize">{label}</div>
+          <div className="text-xl font-bold text-gray-800 dark:text-gray-100">
+            {value}
           </div>
         </div>
-      )}
+        {trailingItem && <div className="ml-2">{trailingItem}</div>}
+      </div>
     </div>
+  );
+};
+
+// Extracted FollowUpCard component for clarity
+const FollowUpCard = ({
+  fup,
+  isAssignedUser,
+  editingFollowUpId,
+  setEditingFollowUpId,
+  followUpEdits,
+  handleChange,
+  handleSaveEdit,
+  getFollowUpStatusColorClass,
+}) => {
+  const isEditing = editingFollowUpId === fup.id;
+
+  if (isEditing) {
+    return (
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className={`relative rounded-2xl border-l-4 p-6 shadow-lg ${getFollowUpStatusColorClass(
+          fup.status
+        )}`}
+      >
+        <div className="space-y-4">
+          {/* Date Input */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+              Date
+            </label>
+            <Input
+              type="date"
+              value={followUpEdits[fup.id]?.follow_up_date}
+              onChange={(e) =>
+                handleChange(fup.id, "follow_up_date", e.target.value)
+              }
+              className="w-full px-4 py-3 rounded-xl border-gray-300 dark:border-gray-600 dark:bg-gray-900/50 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-purple-500"
+            />
+          </div>
+          {/* Type Select */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+              Type
+            </label>
+            <select
+              value={followUpEdits[fup.id]?.follow_up_type}
+              onChange={(e) =>
+                handleChange(fup.id, "follow_up_type", e.target.value)
+              }
+              className="w-full px-4 py-3 rounded-xl border-gray-300 dark:border-gray-600 dark:bg-gray-900/50 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-purple-500"
+            >
+              <option value="phone">📞 Phone</option>
+              <option value="onsite">🏥 Onsite</option>
+              <option value="virtual">💻 Virtual</option>
+            </select>
+          </div>
+          {/* Notes Textarea */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+              Notes
+            </label>
+            <textarea
+              value={followUpEdits[fup.id]?.notes}
+              onChange={(e) => handleChange(fup.id, "notes", e.target.value)}
+              rows={3}
+              className="w-full px-4 py-3 rounded-xl border-gray-300 dark:border-gray-600 dark:bg-gray-900/50 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-purple-500 resize-vertical"
+            />
+          </div>
+          {/* Status Select */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+              Status
+            </label>
+            <select
+              value={followUpEdits[fup.id]?.status}
+              onChange={(e) => handleChange(fup.id, "status", e.target.value)}
+              className="w-full px-4 py-3 rounded-xl border-gray-300 dark:border-gray-600 dark:bg-gray-900/50 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-purple-500"
+            >
+              <option value="pending">⏳ Pending</option>
+              <option value="upcoming">📅 Upcoming</option>
+              <option value="completed">✅ Completed</option>
+            </select>
+          </div>
+          {/* Action Buttons */}
+          <div className="flex justify-end space-x-3 pt-4">
+            <Button
+              onClick={() => setEditingFollowUpId(null)}
+              variant="outline"
+              className="dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-300 dark:border-gray-600"
+            >
+              <X className="h-4 w-4 mr-2" />
+              <span>Cancel</span>
+            </Button>
+            <Button
+              onClick={() => handleSaveEdit(fup.id)}
+              className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white shadow-lg"
+            >
+              <Save className="h-4 w-4 mr-2" />
+              <span>Save</span>
+            </Button>
+          </div>
+        </div>
+      </motion.div>
+    );
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
+      className={`relative rounded-2xl border-l-4 p-6 shadow-lg ${getFollowUpStatusColorClass(
+        fup.status
+      )}`}
+    >
+      {isAssignedUser && fup.status !== "completed" && (
+        <Button
+          onClick={() => {
+            setEditingFollowUpId(fup.id);
+            // Pre-fill edits with current values
+            handleChange(fup.id, "notes", fup.notes);
+            handleChange(fup.id, "status", fup.status);
+            handleChange(fup.id, "follow_up_date", fup.follow_up_date);
+            handleChange(fup.id, "follow_up_type", fup.follow_up_type);
+          }}
+          variant="ghost"
+          size="icon"
+          className="absolute top-4 right-4 text-blue-500 hover:bg-blue-500/10 dark:hover:bg-blue-500/20 rounded-full"
+        >
+          <Edit className="h-5 w-5" />
+        </Button>
+      )}
+      <div className="space-y-3">
+        <div className="flex items-center space-x-3">
+          <CalendarDays className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+          <span className="font-semibold text-gray-700 dark:text-gray-300">
+            {fup.follow_up_date}
+          </span>
+        </div>
+        <div className="flex items-center space-x-3">
+          {fup.follow_up_type === "phone" && (
+            <Phone className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+          )}
+          {fup.follow_up_type === "onsite" && (
+            <HomeIcon className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+          )}
+          {fup.follow_up_type === "virtual" && (
+            <Monitor className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+          )}
+          <span className="text-gray-700 dark:text-gray-300 capitalize">
+            {fup.follow_up_type || "N/A"}
+          </span>
+        </div>
+        <div className="flex items-start space-x-3 pt-2">
+          <MessageSquare className="h-5 w-5 text-gray-500 dark:text-gray-400 flex-shrink-0 mt-1" />
+          <p className="text-gray-700 dark:text-gray-200">
+            {fup.notes || "Upcoming"}
+          </p>
+        </div>
+      </div>
+    </motion.div>
   );
 };
 

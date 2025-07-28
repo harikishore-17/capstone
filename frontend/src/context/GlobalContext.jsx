@@ -1,9 +1,9 @@
-// src/context/GlobalContext.js
 import React, {
   createContext,
   useContext,
   useEffect,
   useState,
+  useCallback,
   useMemo,
 } from "react";
 
@@ -24,41 +24,40 @@ export const GlobalProvider = ({ children }) => {
   const BASE_URL = process.env.REACT_APP_API_BASE_URL;
 
   /* Fetch everything from /patients/all */
-  useEffect(() => {
-    if (!token) return;
+  const fetchAll = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`${BASE_URL}/patients/all`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error("Fetch failed");
+      const data = await res.json();
 
-    const fetchAll = async () => {
-      setLoading(true);
-      try {
-        const res = await fetch(`${BASE_URL}/patients/all`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!res.ok) throw new Error("Fetch failed");
-        const data = await res.json();
-
-        /* backend delivers:
-           {
-             patients_details: [...] ,
-             user_details:     [...] ,
-             pending_tasks_count: n ,
-             escalations_count:   n
-           }
-        */
-        setPatients(data.patients_details);
-        setUsers(data.user_details);
-        setCounts({
-          pendingTasks: data.pending_tasks_count,
-          escalations: data.escalations_count,
-        });
-      } catch (err) {
-        console.error("GlobalContext fetch error:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchAll();
+      /* backend delivers:
+         {
+           patients_details: [...] ,
+           user_details:     [...] ,
+           pending_tasks_count: n ,
+           escalations_count:   n
+         }
+      */
+      setLoading(false);
+      setPatients(data.patients_details);
+      setUsers(data.user_details);
+      setCounts({
+        pendingTasks: data.pending_tasks_count,
+        escalations: data.escalations_count,
+      });
+    } catch (err) {
+      console.error("GlobalContext fetch error:", err);
+    } finally {
+      setLoading(false);
+    }
   }, [token, BASE_URL]);
+
+  useEffect(() => {
+    fetchAll();
+  }, [fetchAll]);
 
   /* Group patients by disease (lower‑case keys) */
   const groupedPatients = useMemo(() => {
@@ -77,9 +76,9 @@ export const GlobalProvider = ({ children }) => {
     groupedPatients,
     users, // [{ id, username }]
     counts, // { pendingTasks, escalations }
-    // helper arrays:
     patientIds: patients.map((p) => p.patient_id),
     userIds: users.map((u) => u.id),
+    refreshData: fetchAll, // Expose fetchAll as refreshData
   };
 
   return (
