@@ -412,6 +412,11 @@ const PredictionForm = () => {
               {isLoading ? "Generating..." : "Generate Prediction"}
             </button>
           </div>
+          <h2 className="text-sm text-red-500 dark:text-red-400 mt-2">
+            caution : This is an AI Generated Prediction, Make sure to validate
+            it with clinical data and patient's condition. You can always
+            escalate risk level by providing additional context or information.
+          </h2>
         </form>
       </div>
 
