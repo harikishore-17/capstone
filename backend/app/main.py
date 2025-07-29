@@ -1,3 +1,4 @@
+import os
 from datetime import datetime
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI,Request, Depends
@@ -8,7 +9,10 @@ from app.utils.error_logger import log_error_to_db
 from app.dependencies import get_db
 import traceback
 from app.db_schema.patient_related import FollowUp
+from dotenv import load_dotenv
 
+load_dotenv()
+FRONTEND_URL = os.getenv("FRONTEND_URL")
 app = FastAPI()
 app.include_router(predict.router)
 app.include_router(auth.router)
@@ -20,7 +24,8 @@ app.include_router(notifications.router)
 # Allow localhost frontend access
 origins = [
     "http://localhost:3000",       # React dev server
-    "http://127.0.0.1:3000"        # Just in case
+    "http://127.0.0.1:3000",
+    FRONTEND_URL
 ]
 
 app.add_middleware(
