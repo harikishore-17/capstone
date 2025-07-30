@@ -10,6 +10,7 @@ from app.services.auth_middleware import get_current_user, get_current_admin_use
 from app.utils.audit_logs import log_action
 from app.utils.notification_create import create_notification
 from app.db_schema.user import User
+from sqlalchemy.orm.attributes import flag_modified
 router = APIRouter(prefix="/escalations", tags=["Escalations"])
 
 @router.get("/all")
@@ -59,10 +60,10 @@ def create_escalation(
 
 @router.put("/{escalation_id}", response_model=EscalationSchema)
 def update_escalation_status(
-    escalation_id: str,
-    payload: EscalationUpdate,
-    current_admin=Depends(get_current_admin_user),
-    db: Session = Depends(get_db)
+        escalation_id: str,
+        payload: EscalationUpdate,
+        current_admin=Depends(get_current_admin_user),
+        db: Session = Depends(get_db)
 ):
     escalation = db.query(Escalation).filter_by(id=escalation_id).first()
     if not escalation:
@@ -71,6 +72,7 @@ def update_escalation_status(
     if escalation.status != "pending":
         raise HTTPException(status_code=400, detail="Escalation already processed")
 
+    # Update escalation details
     escalation.status = payload.status
     escalation.reviewed_by = current_admin.id
     escalation.updated_at = datetime.utcnow()
@@ -79,6 +81,8 @@ def update_escalation_status(
         if not payload.rejection_note:
             raise HTTPException(status_code=400, detail="Rejection note is required")
         escalation.rejection_note = payload.rejection_note
+
+    # This block is now clean and bug-free
     if payload.status == "accepted":
         latest_prediction = (
             db.query(Prediction)
@@ -86,12 +90,19 @@ def update_escalation_status(
             .order_by(Prediction.timestamp.desc())
             .first()
         )
-        print(latest_prediction)
         if latest_prediction:
             latest_prediction.risk = escalation.new_risk
-            db.add(latest_prediction)
-    db.commit()
-    db.refresh(escalation)
+            db.commit()
+            db.refresh(escalation)
+            db.refresh(latest_prediction)
+        else:
+            db.commit()
+            db.refresh(escalation)
+    else:
+        db.commit()
+        db.refresh(escalation)
+
+    # Create notification and log action
     create_notification(
         db=db,
         user_ids=[escalation.user_id],

@@ -46,7 +46,7 @@ const AllPatients = () => {
   const [searchTerm, setSearchTerm] = useState("");
 
   const riskOptions = useMemo(
-    () => [...new Set(patients.map((p) => p.prediction?.risk).filter(Boolean))],
+    () => [...new Set(patients.map((p) => p.risk).filter(Boolean))],
     [patients]
   );
   const condOptions = useMemo(

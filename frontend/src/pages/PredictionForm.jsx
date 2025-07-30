@@ -496,7 +496,7 @@ const PredictionForm = () => {
               </h4>
             </div>
             <div
-              className="bg-white dark:bg-black border border-gray-200 dark:border-slate-700 p-3 rounded-lg max-h-[400px] overflow-auto shadow-inner"
+              className="bg-white dark:bg-black border border-gray-200 dark:border-slate-700 p-3 rounded-lg max-h-[400px] overflow-auto shadow-inner dark:text-white"
               dangerouslySetInnerHTML={{
                 __html: cleanedExplanation(predictionOutput.explanation),
               }}
