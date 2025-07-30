@@ -1,4 +1,4 @@
-import React, { useState, useContext, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import { useGlobalContext } from "../context/GlobalContext";
 
 const curr_username = JSON.parse(localStorage.getItem("user"))?.username;
@@ -12,7 +12,7 @@ const FollowUps = () => {
     return patients.filter(
       (patient) => patient.assigned_username === curr_username
     );
-  }, [patients, curr_username]);
+  }, [patients]);
 
   const patientsData = myAssignedPatients;
   const today = new Date().toISOString().split("T")[0];

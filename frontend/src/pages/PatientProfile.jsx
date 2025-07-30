@@ -68,20 +68,6 @@ const PatientProfile = () => {
     fetchPatient();
   }, [patientId, token, BASE_URL, navigate]);
 
-  const getRiskColorClass = (risk) => {
-    // Corrected for dark mode visibility
-    switch (risk?.toLowerCase()) {
-      case "high":
-        return "bg-red-100 text-red-700 border-red-300 dark:bg-red-900/40 dark:text-red-300 dark:border-red-700";
-      case "medium":
-        return "bg-yellow-100 text-yellow-700 border-yellow-300 dark:bg-yellow-900/40 dark:text-yellow-300 dark:border-yellow-700";
-      case "low":
-        return "bg-green-100 text-green-700 border-green-300 dark:bg-green-900/40 dark:text-green-300 dark:border-green-700";
-      default:
-        return "bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-700/40 dark:text-gray-300 dark:border-gray-600";
-    }
-  };
-
   const getFollowUpStatusColorClass = (status) => {
     // Corrected for dark mode visibility
     switch (status) {

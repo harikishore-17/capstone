@@ -1,10 +1,16 @@
 import React, { useState, useContext } from "react";
 import { AuthContext } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
-import { KeyRound, Lock, Unlock, ArrowLeft } from "lucide-react";
+import { KeyRound, Unlock, ArrowLeft } from "lucide-react";
 import { motion } from "framer-motion";
 
 const ChangePassword = () => {
@@ -39,7 +45,9 @@ const ChangePassword = () => {
         throw new Error(data.detail || "Failed to update password.");
       }
 
-      setSuccess("Password updated successfully! You will be logged out. Please log in again with your new password.");
+      setSuccess(
+        "Password updated successfully! You will be logged out. Please log in again with your new password."
+      );
       setTimeout(() => {
         logout(); // Log out the user
         navigate("/login"); // Redirect to login page
@@ -71,9 +79,12 @@ const ChangePassword = () => {
             >
               <KeyRound className="h-10 w-10 text-white" />
             </motion.div>
-            <CardTitle className="text-3xl font-bold gradient-text">Change Your Password</CardTitle>
+            <CardTitle className="text-3xl font-bold gradient-text">
+              Change Your Password
+            </CardTitle>
             <CardDescription className="text-gray-600 dark:text-gray-300 text-base">
-              As a new user, you must update the temporary password provided by your administrator.
+              As a new user, you must update the temporary password provided by
+              your administrator.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -136,5 +147,3 @@ const ChangePassword = () => {
 };
 
 export default ChangePassword;
-
-

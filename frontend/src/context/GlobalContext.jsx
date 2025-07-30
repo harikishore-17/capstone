@@ -56,9 +56,10 @@ export const GlobalProvider = ({ children }) => {
   }, [token, BASE_URL]);
 
   useEffect(() => {
-    fetchAll();
-  }, [fetchAll]);
-
+    if (token) {
+      fetchAll();
+    }
+  }, [token, fetchAll]);
   /* Group patients by disease (lower‑case keys) */
   const groupedPatients = useMemo(() => {
     const bucket = { pneumonia: [], "heart failure": [], diabetes: [] };
