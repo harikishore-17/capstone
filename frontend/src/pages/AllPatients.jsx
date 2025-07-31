@@ -66,7 +66,7 @@ const AllPatients = () => {
     let filtered = patients;
 
     if (riskFilter) {
-      filtered = filtered.filter((p) => p.prediction?.risk === riskFilter);
+      filtered = filtered.filter((p) => p.risk === riskFilter);
     }
     if (condFilter) {
       filtered = filtered.filter((p) => p.disease_type === condFilter);
